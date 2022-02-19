@@ -2,7 +2,7 @@ import sys
 import os
 import yapic.json as json
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from joblib import Parallel, delayed
 from multiprocessing import Process, Manager, JoinableQueue, freeze_support
@@ -13,6 +13,7 @@ c = Config(config="config.yaml")
 parallel = int(c.parallel)
 start_date = datetime.strptime(str(c.start_date), "%Y-%m-%d")
 start_offset = int(c.start_offset)
+end_date = datetime.strptime(str(c.end_date), "%Y-%m-%d")
 outputdir = str(c.output_dir)
 exchange = str(c.exchange)
 channel = str(c.channel)
@@ -84,10 +85,13 @@ def get_data_feeds(date_str, offset, exchange, auth_key):
 
 if __name__ == '__main__':
     freeze_support()
-    m = Manager()
-    q = m.Queue()
-    p = Process(target=saver, args=(q,c.start_date + ".txt"))
-    p.start()
-    Parallel(n_jobs=parallel)(delayed(get_data_feeds)(c.start_date, i, exchange, auth_key) for i in range (0,1441))
-    q.put(None) # Poison pill
-    p.join()
+
+    date_generated = [start_date + timedelta(days=x) for x in range(0, (end_date-start_date).days)]
+    for date in date_generated:
+        m = Manager()
+        q = m.Queue()
+        p = Process(target=saver, args=(q,date.strftime("%Y-%m-%d") + ".txt"))
+        p.start()
+        Parallel(n_jobs=parallel)(delayed(get_data_feeds)(date, i, exchange, auth_key) for i in range (start_offset,1441))
+        q.put(None) # Poison pill
+        p.join()
