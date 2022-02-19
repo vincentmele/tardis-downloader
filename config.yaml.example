@@ -1,0 +1,9 @@
+parallel: 5
+start_date: "2021-12-13"
+start_offset: 0
+output_dir: "./output"
+exchange: "deribit"
+channel: "book"
+symbols: "BTC-PERPETUAL"
+deribit:
+  key: "<insert here>"
