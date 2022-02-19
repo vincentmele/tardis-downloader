@@ -1,2 +1,4 @@
 yapic.json
 joblib
+requests
+pyyaml
