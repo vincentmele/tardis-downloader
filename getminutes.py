@@ -86,8 +86,8 @@ if __name__ == '__main__':
     freeze_support()
     m = Manager()
     q = m.Queue()
-    p = Process(target=saver, args=(q,sys.argv[1] + ".txt"))
+    p = Process(target=saver, args=(q,c.start_date + ".txt"))
     p.start()
-    Parallel(n_jobs=parallel)(delayed(get_data_feeds)(sys.argv[1], i) for i in range (0,1441))
+    Parallel(n_jobs=parallel)(delayed(get_data_feeds)(c.start_date, i, exchange, auth_key) for i in range (0,1441))
     q.put(None) # Poison pill
     p.join()
