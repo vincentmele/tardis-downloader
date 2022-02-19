@@ -5,7 +5,7 @@ import requests
 from datetime import datetime
 
 from joblib import Parallel, delayed
-from multiprocessing import Process, Manager, JoinableQueue
+from multiprocessing import Process, Manager, JoinableQueue, freeze_support
 from config import Config
 
 c = Config(config="config.yaml")
@@ -18,6 +18,9 @@ exchange = str(c.exchange)
 channel = str(c.channel)
 symbol = str(c.symbol)
 auth_key = str(c.deribit.key)
+
+if not os.path.exists(outputdir):
+    os.makedirs(outputdir)
 
 def saver(q, filename):
     with open(os.path.join(outputdir, filename), 'w') as out:
@@ -79,10 +82,12 @@ def get_data_feeds(date_str, offset, exchange, auth_key):
 #        # message is a message dict as provided by exchange real-time stream
 #        print(local_timestamp, message)
 
-m = Manager()
-q = m.Queue()
-p = Process(target=saver, args=(q,sys.argv[1] + ".txt"))
-p.start()
-Parallel(n_jobs=parallel)(delayed(get_data_feeds)(sys.argv[1], i) for i in range (0,1441))
-q.put(None) # Poison pill
-p.join()
+if __name__ == '__main__':
+    freeze_support()
+    m = Manager()
+    q = m.Queue()
+    p = Process(target=saver, args=(q,sys.argv[1] + ".txt"))
+    p.start()
+    Parallel(n_jobs=parallel)(delayed(get_data_feeds)(sys.argv[1], i) for i in range (0,1441))
+    q.put(None) # Poison pill
+    p.join()
