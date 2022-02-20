@@ -20,6 +20,8 @@ channel = str(c.channel)
 symbol = str(c.symbol)
 auth_key = str(c.deribit.key)
 
+
+
 if not os.path.exists(outputdir):
     os.makedirs(outputdir)
 
@@ -35,8 +37,12 @@ def saver(q, filename):
 
 
 def addID(message):
-    tp = str(message['params']['data']['type'][0])
-    id = str(message['params']['data']['change_id']) + tp.encode().hex()
+    if exchange == "deribit":
+        if channel == "book":
+            tp = str(message['params']['data']['type'][0])
+            id = str(message['params']['data']['change_id']) + tp.encode().hex()
+        elif channel == "trades":
+            id = str(message['params']['data'][0]['timestamp'])
     message['_id'] = id
     return message
 
@@ -44,7 +50,7 @@ def addID(message):
 def get_data_feeds(date_str, offset, exchange, auth_key):
     filters = [
 #        {"channel": "trades", "symbols": ["BTC-PERPETUAL", "ETH-PERPETUAL"]}
-        {"channel": "book", "symbols": ["BTC-PERPETUAL"]}
+        {"channel": channel, "symbols": [symbol]}
     ]
     qs_params = {"from": date_str, "offset": offset, "filters": json.dumps(filters)}
 
@@ -54,21 +60,19 @@ def get_data_feeds(date_str, offset, exchange, auth_key):
 
     response = requests.get(url, headers=headers, params=qs_params, stream=True)
 
-    output_filename = str(date_str) + "_" + str(offset) + ".txt"
-#    open(output_filename, 'wb').write(response.content)
-#    print("wrote ", output_filename)
-
     lines = []
     for line in response.iter_lines():
         if len(line) <= 1:
           continue
-
-        parts = line.decode("utf-8").split(" ")
-        message = json.loads(parts[1])
-        message = addID(message)
-        lines.append(json.dumps(message) + "\n")    
+        try:
+            parts = line.decode("utf-8").split(" ")
+            message = json.loads(parts[1])
+            message = addID(message)
+            lines.append(json.dumps(message) + "\n")
+        except:
+            continue    
     q.put(''.join(lines))
-    print("wrote ", output_filename)
+    print(f"wrote {output_filename}_{offset}  {round(offset/1440,2)}")
     
 #   for line in response.iter_lines():
 #        # empty lines in response are being used as markers
@@ -90,7 +94,8 @@ if __name__ == '__main__':
     for date in date_generated:
         m = Manager()
         q = m.Queue()
-        p = Process(target=saver, args=(q,date.strftime("%Y-%m-%d") + ".txt"))
+        output_filename = channel + "-" + symbol + "-" + date.strftime("%Y-%m-%d") + ".txt"
+        p = Process(target=saver, args=(q, output_filename))
         p.start()
         Parallel(n_jobs=parallel)(delayed(get_data_feeds)(date, i, exchange, auth_key) for i in range (start_offset,1441))
         q.put(None) # Poison pill
